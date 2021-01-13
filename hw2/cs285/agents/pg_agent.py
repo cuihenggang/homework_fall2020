@@ -3,6 +3,7 @@ import numpy as np
 from .base_agent import BaseAgent
 from cs285.policies.MLP_policy import MLPPolicyPG
 from cs285.infrastructure.replay_buffer import ReplayBuffer
+from cs285.infrastructure import utils
 
 
 class PGAgent(BaseAgent):
@@ -46,7 +47,7 @@ class PGAgent(BaseAgent):
 
         # TODO: step 3: use all datapoints (s_t, a_t, q_t, adv_t) to update the PG actor/policy
         ## HINT: `train_log` should be returned by your actor update method
-        train_log = TODO
+        train_log = self.actor.update(observations, actions, advantages, q_values)
 
         return train_log
 
@@ -91,7 +92,7 @@ class PGAgent(BaseAgent):
             ## have the same mean and standard deviation as the current batch of q_values
             baselines = baselines_unnormalized * np.std(q_values) + np.mean(q_values)
             ## TODO: compute advantage estimates using q_values and baselines
-            advantages = TODO
+            advantages = q_values - baselines
 
         # Else, just set the advantage to [Q]
         else:
@@ -102,7 +103,7 @@ class PGAgent(BaseAgent):
             ## TODO: standardize the advantages to have a mean of zero
             ## and a standard deviation of one
             ## HINT: there is a `normalize` function in `infrastructure.utils`
-            advantages = TODO
+            advantages = utils.normalize(advantages, np.mean(advantages), np.std(advantages))
 
         return advantages
 
@@ -132,6 +133,11 @@ class PGAgent(BaseAgent):
         # Hint: note that all entries of this output are equivalent
             # because each sum is from 0 to T (and doesnt involve t)
 
+        num_rewards = len(rewards)
+        discounts = np.asarray([self.gamma ** t for t in range(num_rewards)])
+        reward_sum = np.sum(rewards * discounts)
+        list_of_discounted_returns = [reward_sum] * num_rewards
+
         return list_of_discounted_returns
 
     def _discounted_cumsum(self, rewards):
@@ -147,5 +153,12 @@ class PGAgent(BaseAgent):
         # HINT2: it is possible to write a vectorized solution, but a solution
             # using a for loop is also fine
 
-        return list_of_discounted_cumsums
+        num_rewards = len(rewards)
+        discounts = np.asarray([self.gamma ** t for t in range(num_rewards)])
 
+        list_of_discounted_cumsums = []
+        for idx in range(num_rewards):
+            discounted_cumsum = np.sum(rewards[idx:] * discounts[:(num_rewards - idx)])
+            list_of_discounted_cumsums.append(discounted_cumsum)
+
+        return list_of_discounted_cumsums
